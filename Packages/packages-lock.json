@@ -10,6 +10,12 @@
       },
       "hash": "d76a8df311c48263872be0cd3e6a8ef1a0fa8e59"
     },
+    "com.meta.xr.mcp.extension.coplaydev": {
+      "version": "file:/Users/dilmerv/Code/ExternalPackages/com.meta.xr.mcp.extension.coplay",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {}
+    },
     "com.meta.xr.sdk.core": {
       "version": "85.0.0",
       "depth": 1,
