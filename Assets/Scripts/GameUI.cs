@@ -78,7 +78,7 @@ public class GameUI : MonoBehaviour
     {
         for (int t = 10; t > 0; t--)
         {
-            _gameOverText.text = $"GAME OVER\n<size=26>Score: {finalScore}  |  Missed: {missedCount} / 10\nRestarting in {t}...</size>";
+            _gameOverText.text = $"GAME OVER\nRestarting in {t}...</size>";
             yield return new WaitForSeconds(1f);
         }
         _countdownCoroutine = null;
