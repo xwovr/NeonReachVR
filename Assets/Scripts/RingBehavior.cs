@@ -5,7 +5,10 @@ public class RingBehavior : MonoBehaviour
     [HideInInspector] public float MoveSpeed      = 2f;
     [HideInInspector] public float MissZThreshold = -0.5f;
 
-    private bool _done;
+    private bool          _done;
+    private RingExplosion _explosion;
+
+    private void Awake() => _explosion = GetComponent<RingExplosion>();
 
     private void OnEnable()
     {
@@ -35,6 +38,7 @@ public class RingBehavior : MonoBehaviour
     {
         if (_done) return;
         _done = true;
+        _explosion?.Explode(transform.position);
         GameManager.Instance?.AddScore();
         Destroy(gameObject);
     }
