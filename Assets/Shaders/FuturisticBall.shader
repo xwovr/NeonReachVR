@@ -20,19 +20,22 @@ Shader "Custom/FuturisticBall"
             "RenderPipeline" = "UniversalPipeline"
         }
 
-        // --- Pass 1: additive rim glow ---
         Pass
         {
             Name "RimGlow"
             Tags { "LightMode" = "UniversalForward" }
 
-            Blend  SrcAlpha One   // additive — stacks light onto the scene
+            Blend  SrcAlpha One
             ZWrite Off
             Cull   Back
 
             HLSLPROGRAM
             #pragma vertex   vert
             #pragma fragment frag
+
+            // Required for Single-Pass Instanced rendering on Meta Quest
+            #pragma multi_compile_instancing
+            #pragma instancing_options renderingLayer
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
@@ -50,6 +53,7 @@ Shader "Custom/FuturisticBall"
             {
                 float4 positionOS : POSITION;
                 float3 normalOS   : NORMAL;
+                UNITY_VERTEX_INPUT_INSTANCE_ID  // stereo eye index source
             };
 
             struct Varyings
@@ -57,11 +61,19 @@ Shader "Custom/FuturisticBall"
                 float4 positionCS : SV_POSITION;
                 float3 normalWS   : TEXCOORD0;
                 float3 viewDirWS  : TEXCOORD1;
+                UNITY_VERTEX_INPUT_INSTANCE_ID  // needed for frag access
+                UNITY_VERTEX_OUTPUT_STEREO      // routes output to the correct eye
             };
 
             Varyings vert(Attributes IN)
             {
                 Varyings OUT;
+
+                // Set up instancing and stereo eye for this vertex
+                UNITY_SETUP_INSTANCE_ID(IN);
+                UNITY_TRANSFER_INSTANCE_ID(IN, OUT);
+                UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(OUT);
+
                 float3 posWS   = TransformObjectToWorld(IN.positionOS.xyz);
                 OUT.positionCS = TransformWorldToHClip(posWS);
                 OUT.normalWS   = TransformObjectToWorldNormal(IN.normalOS);
@@ -71,25 +83,22 @@ Shader "Custom/FuturisticBall"
 
             half4 frag(Varyings IN) : SV_Target
             {
+                // Resolve which eye this fragment belongs to
+                UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
+
                 float3 N = normalize(IN.normalWS);
                 float3 V = normalize(IN.viewDirWS);
 
-                // Fresnel: 0 at center, 1 at silhouette edge
                 float NdotV  = saturate(dot(N, V));
                 float fresnel = pow(1.0 - NdotV, _FresnelPower);
 
-                // Subtle pulse on the rim
                 float pulse = 1.0 + _PulseAmount * sin(_Time.y * _PulseSpeed);
 
-                // Inner core: dim, slightly transparent
                 float3 core = _CoreColor.rgb * (1.0 - fresnel) * 0.35;
-
-                // Outer rim: bright additive glow
                 float3 rim  = _RimColor.rgb * _EmissionIntensity
                             * fresnel * _FresnelStrength * pulse;
 
                 float3 color = core + rim;
-                // Alpha strongest at rim, faint at centre
                 float  alpha = saturate(fresnel * 0.85 + 0.12);
 
                 return half4(color, alpha);
