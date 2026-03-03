@@ -28,7 +28,8 @@ public class PinchBallLauncher : MonoBehaviour
     [SerializeField] [Range(0f, 1f)] private float _pinchReleaseThreshold = 0.5f;
 
     [Header("Aim Line")]
-    [SerializeField] private float _aimLineWidth = 0.005f;
+    [SerializeField] private Material _aimLineMaterial; // assign AimLine.mat
+    [SerializeField] private float    _aimLineWidth = 0.005f;
 
     // Runtime refs (auto-found in Start)
     private IHand        _hand;
@@ -77,14 +78,8 @@ public class PinchBallLauncher : MonoBehaviour
         _aimLine.receiveShadows    = false;
         _aimLine.enabled           = false;
 
-        // Runtime material — cyan tint on the same TrailLine shader
-        var shader = Shader.Find("Custom/TrailLine");
-        if (shader != null)
-        {
-            var mat = new Material(shader) { name = "AimLine_Runtime" };
-            mat.SetColor("_Color", new Color(0.15f, 0.85f, 1f, 1f));
-            _aimLine.material = mat;
-        }
+        if (_aimLineMaterial != null)
+            _aimLine.material = _aimLineMaterial;
 
         // Opaque cyan at origin → fades out at the hand end
         var gradient = new Gradient();
