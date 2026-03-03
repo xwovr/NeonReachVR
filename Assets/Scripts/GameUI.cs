@@ -28,10 +28,11 @@ public class GameUI : MonoBehaviour
 
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.OnScoreChanged  += RefreshScore;
-            GameManager.Instance.OnMissedChanged += RefreshMissed;
-            GameManager.Instance.OnGameOver      += ShowGameOver;
-            GameManager.Instance.OnGameRestart   += HideGameOver;
+            GameManager.Instance.OnScoreChanged     += RefreshScore;
+            GameManager.Instance.OnMissedChanged    += RefreshMissed;
+            GameManager.Instance.OnGameOver         += ShowGameOver;
+            GameManager.Instance.OnGameRestart      += HideGameOver;
+            GameManager.Instance.OnHighScoreChanged += OnHighScoreUpdated;
         }
     }
 
@@ -39,10 +40,11 @@ public class GameUI : MonoBehaviour
     {
         if (GameManager.Instance != null)
         {
-            GameManager.Instance.OnScoreChanged  -= RefreshScore;
-            GameManager.Instance.OnMissedChanged -= RefreshMissed;
-            GameManager.Instance.OnGameOver      -= ShowGameOver;
-            GameManager.Instance.OnGameRestart   -= HideGameOver;
+            GameManager.Instance.OnScoreChanged     -= RefreshScore;
+            GameManager.Instance.OnMissedChanged    -= RefreshMissed;
+            GameManager.Instance.OnGameOver         -= ShowGameOver;
+            GameManager.Instance.OnGameRestart      -= HideGameOver;
+            GameManager.Instance.OnHighScoreChanged -= OnHighScoreUpdated;
         }
     }
 
@@ -55,7 +57,12 @@ public class GameUI : MonoBehaviour
     }
 
     private void RefreshScore(int score)
-        => _scoreText.text = $"SCORE\n<size=52>{score}</size>";
+    {
+        int best = GameManager.Instance?.HighScore ?? 0;
+        _scoreText.text = $"SCORE\n<size=52>{score}</size>\n<size=15><color=#88BBCC>BEST  {best}</color></size>";
+    }
+
+    private void OnHighScoreUpdated(int _) => RefreshScore(GameManager.Instance?.Score ?? 0);
 
     private void RefreshMissed(int missed, int max)
         => _missedLiveText.text = $"MISSED  <color=#FF8C42>{missed}</color> / {max}";
