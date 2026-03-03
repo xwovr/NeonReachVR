@@ -44,15 +44,21 @@ public class PinchBallLauncher : MonoBehaviour
     private Vector3    _chargeAxis;               // locked at pinch-start
     private bool _wasPinching;
 
-    private void Start()
+private void Start()
     {
-        // Auto-find ISDK Hand matching the desired handedness
-        foreach (var h in FindObjectsByType<Hand>(FindObjectsSortMode.None))
+        // Prefer the Hand on the parent hierarchy — launcher is a child of LeftInteractions / RightInteractions
+        _hand = GetComponentInParent<IHand>();
+
+        // Fallback: search the whole scene filtered by handedness
+        if (_hand == null)
         {
-            if (h.Handedness == _handedness)
+            foreach (var h in FindObjectsByType<Hand>(FindObjectsSortMode.None))
             {
-                _hand = h as IHand;
-                break;
+                if (h.Handedness == _handedness)
+                {
+                    _hand = h as IHand;
+                    break;
+                }
             }
         }
 
