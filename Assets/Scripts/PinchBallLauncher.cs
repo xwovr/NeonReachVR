@@ -129,14 +129,14 @@ public class PinchBallLauncher : MonoBehaviour
     {
         if (_activeBall == null) return;
 
-        // Line: origin → current hand position
-        _aimLine.SetPosition(0, _pinchOrigin);
-        _aimLine.SetPosition(1, pinchPos);
+        // Line: from pulled-back hand → pinch origin (arrow points in launch direction)
+        _aimLine.SetPosition(0, pinchPos);
+        _aimLine.SetPosition(1, _pinchOrigin);
 
-        // Aim direction = direction of the line
+        // Aim = opposite of pull direction (slingshot: pull back → launch forward)
         Vector3 delta = pinchPos - _pinchOrigin;
         if (delta.sqrMagnitude > 0.0001f)
-            _aimDirection = delta.normalized;
+            _aimDirection = -delta.normalized;
 
         // Ball stays at hand position — trail traces the swing gesture
         _activeBall.transform.position = pinchPos;

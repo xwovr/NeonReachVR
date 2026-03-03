@@ -10,14 +10,20 @@ Shader "Custom/TrailLine"
     {
         Tags
         {
-            "RenderType"  = "Transparent"
-            "Queue"       = "Transparent"
+            "RenderType"     = "Transparent"
+            "Queue"          = "Transparent"
             "RenderPipeline" = "UniversalPipeline"
         }
 
         Pass
         {
-            Blend SrcAlpha One   // Additive — produces a warm glow
+            // SRPDefaultUnlit tells URP to always render this pass for
+            // unlit transparent effects (particles, trails, line renderers).
+            // Without this tag the pass is silently skipped on Android/Quest.
+            Name "SRPDefaultUnlit"
+            Tags { "LightMode" = "SRPDefaultUnlit" }
+
+            Blend SrcAlpha One   // Additive — warm glow
             ZWrite Off
             Cull Off
 
@@ -25,7 +31,7 @@ Shader "Custom/TrailLine"
             #pragma vertex   vert
             #pragma fragment frag
             #pragma multi_compile_instancing
-            #pragma instancing_options renderingLayer
+            #pragma multi_compile_fog
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
 
@@ -40,7 +46,7 @@ Shader "Custom/TrailLine"
             struct Attributes
             {
                 float4 positionOS : POSITION;
-                float4 color      : COLOR;
+                half4  color      : COLOR;
                 float2 uv         : TEXCOORD0;
                 UNITY_VERTEX_INPUT_INSTANCE_ID
             };
