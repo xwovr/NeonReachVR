@@ -1,4 +1,5 @@
 ﻿<Solution>
   <Project Path="Oculus.Interaction.Editor.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
   <Project Path="Meta.XR.MCP.Extension.Editor.csproj" />
 </Solution>
