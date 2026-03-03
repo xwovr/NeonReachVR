@@ -157,6 +157,7 @@ public class PinchBallLauncher : MonoBehaviour
         var rb = _activeBall.GetComponent<Rigidbody>();
         if (rb != null)
         {
+            rb.collisionDetectionMode = CollisionDetectionMode.ContinuousDynamic;
             rb.isKinematic    = false;
             rb.useGravity     = true;
             rb.linearVelocity = _aimDirection * (charge * _launchMultiplier);
