@@ -15,8 +15,8 @@ public class PinchBallLauncher : MonoBehaviour
     [SerializeField] private Handedness _handedness = Handedness.Left;
 
     [Header("Ball")]
+    [SerializeField] private GameObject _ballPrefab;
     [SerializeField] private float _ballScale = 0.04f;
-    [SerializeField] private Color _ballColor = Color.red;
 
     [Header("Launch")]
     [SerializeField] private float _launchMultiplier = 20f;
@@ -29,6 +29,7 @@ public class PinchBallLauncher : MonoBehaviour
 
     // State
     private GameObject _activeBall;
+    private Material   _activeMaterial;
     private Vector3 _pinchOrigin;
     private Vector3 _aimDirection;
     private bool _wasPinching;
@@ -71,35 +72,32 @@ private void Update()
         _wasPinching = isPinching;
     }
 
-    private void OnPinchStart(Vector3 pinchPos)
+private void OnPinchStart(Vector3 pinchPos)
     {
-        // Clean up any stale ball from an interrupted pinch
         if (_activeBall != null)
             Destroy(_activeBall);
 
         _pinchOrigin = pinchPos;
-
-        // Aim direction: from eye toward the pinch point at the moment of pinch
         _aimDirection = _centerEyeAnchor != null
             ? (pinchPos - _centerEyeAnchor.position).normalized
             : transform.forward;
 
         _activeBall = SpawnBall(pinchPos);
+        SetChargeColor(0f);
     }
 
-    private void OnPinchHold(Vector3 pinchPos)
+private void OnPinchHold(Vector3 pinchPos)
     {
         if (_activeBall == null) return;
 
-        // Ball stays glued to pinch point
         _activeBall.transform.position = pinchPos;
 
-        // Visual feedback: scale up as charge increases
         float t = ComputeCharge(pinchPos) / _maxPullDistance;
         _activeBall.transform.localScale = Vector3.one * Mathf.Lerp(_ballScale, _ballScale * 2f, t);
+        SetChargeColor(t);
     }
 
-    private void OnPinchRelease(Vector3 pinchPos)
+private void OnPinchRelease(Vector3 pinchPos)
     {
         if (_activeBall == null) return;
 
@@ -112,9 +110,9 @@ private void Update()
             rb.linearVelocity = _aimDirection * (charge * _launchMultiplier);
         }
 
-        // Auto-destroy after 5 seconds so balls don't pile up
         Destroy(_activeBall, 5f);
-        _activeBall = null;
+        _activeBall   = null;
+        _activeMaterial = null;
     }
 
     /// <summary>Charge = how far the hand has pulled back opposite to aim direction.</summary>
@@ -138,27 +136,40 @@ private void Update()
         return transform.position;
     }
 
-    private GameObject SpawnBall(Vector3 position)
+private GameObject SpawnBall(Vector3 position)
     {
-        var ball = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-        ball.transform.position = position;
-        ball.transform.localScale = Vector3.one * _ballScale;
-        ball.name = "PinchBall";
-
-        // Apply color via a new material instance
-        var rend = ball.GetComponent<Renderer>();
-        if (rend != null)
+        if (_ballPrefab == null)
         {
-            var mat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
-            mat.color = _ballColor;
-            rend.material = mat;
+            Debug.LogError("[PinchBallLauncher] _ballPrefab is not assigned!");
+            return null;
         }
 
-        // Kinematic while held so physics doesn't interfere
-        var rb = ball.AddComponent<Rigidbody>();
-        rb.isKinematic = true;
-        rb.useGravity = false;
+        var ball = Instantiate(_ballPrefab, position, Quaternion.identity);
+        ball.transform.localScale = Vector3.one * _ballScale;
+
+        // Grab the shared material instance so we can tint it per-ball
+        var rend = ball.GetComponent<Renderer>();
+        if (rend != null)
+            _activeMaterial = rend.material; // .material creates a per-instance copy
+
+        // Start kinematic — physics enabled on release
+        var rb = ball.GetComponent<Rigidbody>();
+        if (rb != null)
+        {
+            rb.isKinematic = true;
+            rb.useGravity  = false;
+        }
 
         return ball;
+    }
+
+
+/// <summary>Lerps CoreColor and RimColor from red (t=0) to green (t=1).</summary>
+    private void SetChargeColor(float t)
+    {
+        if (_activeMaterial == null) return;
+        Color c = Color.Lerp(Color.red, Color.green, t);
+        _activeMaterial.SetColor("_CoreColor", c);
+        _activeMaterial.SetColor("_RimColor",  c);
     }
 }
