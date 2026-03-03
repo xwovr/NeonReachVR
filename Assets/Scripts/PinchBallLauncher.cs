@@ -21,7 +21,10 @@ public class PinchBallLauncher : MonoBehaviour
     [Header("Launch")]
     [SerializeField] private float _launchMultiplier = 20f;
     [SerializeField] private float _maxPullDistance = 0.35f;
+    [Tooltip("Pinch strength required to START holding a ball.")]
     [SerializeField] [Range(0f, 1f)] private float _pinchThreshold = 0.85f;
+    [Tooltip("Pinch strength must drop BELOW this to release. Lower than _pinchThreshold to prevent jitter.")]
+    [SerializeField] [Range(0f, 1f)] private float _pinchReleaseThreshold = 0.5f;
 
     [Header("Aiming")]
     [Tooltip("How much wrist rotation steers the aim. 1 = 1:1, 0.5 = half sensitivity.")]
@@ -64,9 +67,26 @@ public class PinchBallLauncher : MonoBehaviour
 
 private void Update()
     {
-        if (_hand == null || !_hand.IsConnected || !_hand.IsTrackedDataValid) return;
+        if (_hand == null) return;
 
-        bool isPinching = _hand.GetFingerPinchStrength(HandFinger.Index) >= _pinchThreshold;
+        // Reset stale state when tracking is lost mid-pinch
+        if (!_hand.IsConnected || !_hand.IsTrackedDataValid)
+        {
+            if (_wasPinching)
+            {
+                if (_activeBall != null) { Destroy(_activeBall); _activeBall = null; _activeMaterial = null; }
+                _wasPinching = false;
+            }
+            return;
+        }
+
+        float pinchStrength = _hand.GetFingerPinchStrength(HandFinger.Index);
+
+        // Hysteresis: once pinching, sustain until strength drops below release threshold
+        bool isPinching = _wasPinching
+            ? pinchStrength >= _pinchReleaseThreshold
+            : pinchStrength >= _pinchThreshold;
+
         Vector3 pinchPos = GetPinchPosition();
 
         if (isPinching && !_wasPinching)
