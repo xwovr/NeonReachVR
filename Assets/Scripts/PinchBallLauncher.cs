@@ -28,13 +28,11 @@ public class PinchBallLauncher : MonoBehaviour
     [SerializeField] [Range(0f, 1f)] private float _pinchReleaseThreshold = 0.5f;
 
     [Header("Aim Line")]
-    [SerializeField] private Material _aimLineMaterial; // assign AimLine.mat
-    [SerializeField] private float    _aimLineWidth = 0.005f;
+    [SerializeField] private LineRenderer _aimLine; // assign the LineRenderer on this GameObject
 
     // Runtime refs (auto-found in Start)
-    private IHand        _hand;
-    private Transform    _centerEyeAnchor;
-    private LineRenderer _aimLine;
+    private IHand     _hand;
+    private Transform _centerEyeAnchor;
 
     // State
     private GameObject _activeBall;
@@ -64,38 +62,10 @@ public class PinchBallLauncher : MonoBehaviour
         if (_hand == null)
             Debug.LogWarning($"[PinchBallLauncher] No ISDK Hand found for handedness: {_handedness}");
 
-        BuildAimLine();
-    }
-
-    private void BuildAimLine()
-    {
-        _aimLine = GetComponent<LineRenderer>() ?? gameObject.AddComponent<LineRenderer>();
-        _aimLine.positionCount     = 2;
-        _aimLine.startWidth        = _aimLineWidth;
-        _aimLine.endWidth          = _aimLineWidth * 0.35f;
-        _aimLine.useWorldSpace     = true;
-        _aimLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        _aimLine.receiveShadows    = false;
-        _aimLine.enabled           = false;
-
-        if (_aimLineMaterial != null)
-            _aimLine.material = _aimLineMaterial;
-
-        // Opaque cyan at origin → fades out at the hand end
-        var gradient = new Gradient();
-        gradient.SetKeys(
-            new GradientColorKey[]
-            {
-                new GradientColorKey(new Color(0.2f, 0.9f, 1f), 0f),
-                new GradientColorKey(new Color(0.1f, 0.6f, 1f), 1f),
-            },
-            new GradientAlphaKey[]
-            {
-                new GradientAlphaKey(1f,   0f),
-                new GradientAlphaKey(0.3f, 1f),
-            }
-        );
-        _aimLine.colorGradient = gradient;
+        if (_aimLine == null)
+            Debug.LogWarning($"[PinchBallLauncher] _aimLine (LineRenderer) is not assigned on {gameObject.name}!");
+        else
+            _aimLine.enabled = false;
     }
 
     // -----------------------------------------------------------------------
