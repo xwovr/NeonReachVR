@@ -2,10 +2,9 @@ using UnityEngine;
 using Oculus.Interaction.Input;
 
 /// <summary>
-/// Pinch to hold a ball. Swing your hand from the pinch origin — a line renderer
-/// traces that swing vector, and the ball launches in the direction of that line
-/// when you release. A ribbon trail follows the ball (shows the swing gesture while
-/// held, then the throw arc after release).
+/// Pinch (hand tracking) OR index-trigger hold (controller) to hold a ball.
+/// Swing/pull from the grab origin — aim line shows the vector, ball launches
+/// on release. Auto-switches between hand tracking and controller input.
 /// Add one instance per hand (set Handedness to Left or Right).
 /// </summary>
 public class PinchBallLauncher : MonoBehaviour
@@ -22,9 +21,9 @@ public class PinchBallLauncher : MonoBehaviour
     [Header("Launch")]
     [SerializeField] private float _launchMultiplier    = 20f;
     [SerializeField] private float _maxPullDistance     = 0.35f;
-    [Tooltip("Pinch strength required to START holding a ball.")]
+    [Tooltip("Pinch strength / trigger value (0-1) required to START holding a ball.")]
     [SerializeField] [Range(0f, 1f)] private float _pinchThreshold        = 0.85f;
-    [Tooltip("Pinch strength must drop BELOW this to release.")]
+    [Tooltip("Pinch strength / trigger value must drop BELOW this to release.")]
     [SerializeField] [Range(0f, 1f)] private float _pinchReleaseThreshold = 0.5f;
 
     [Header("Aim Line")]
@@ -33,6 +32,16 @@ public class PinchBallLauncher : MonoBehaviour
     // Runtime refs (auto-found in Start)
     private IHand     _hand;
     private Transform _centerEyeAnchor;
+    private Transform _controllerAnchor;
+
+    // Maps handedness to the matching OVR controller
+    private OVRInput.Controller OvrController
+        => _handedness == Handedness.Right ? OVRInput.Controller.RTouch : OVRInput.Controller.LTouch;
+
+    // True when hand tracking is absent/invalid and a controller is connected
+    private bool UseController
+        => !(_hand != null && _hand.IsConnected && _hand.IsTrackedDataValid)
+           && OVRInput.IsControllerConnected(OvrController);
 
     // State
     private GameObject   _activeBall;
@@ -58,7 +67,13 @@ public class PinchBallLauncher : MonoBehaviour
         }
 
         var rig = FindFirstObjectByType<OVRCameraRig>();
-        if (rig != null) _centerEyeAnchor = rig.centerEyeAnchor;
+        if (rig != null)
+        {
+            _centerEyeAnchor  = rig.centerEyeAnchor;
+            _controllerAnchor = _handedness == Handedness.Right
+                ? rig.rightHandAnchor
+                : rig.leftHandAnchor;
+        }
 
         if (_hand == null)
             Debug.LogWarning($"[PinchBallLauncher] No ISDK Hand found for handedness: {_handedness}");
@@ -72,10 +87,11 @@ public class PinchBallLauncher : MonoBehaviour
     // -----------------------------------------------------------------------
     private void Update()
     {
-        if (_hand == null) return;
+        bool inputReady = UseController
+            || (_hand != null && _hand.IsConnected && _hand.IsTrackedDataValid);
 
-        // Reset stale state when tracking is lost mid-pinch
-        if (!_hand.IsConnected || !_hand.IsTrackedDataValid)
+        // Reset stale state when both inputs are unavailable
+        if (!inputReady)
         {
             if (_wasPinching)
             {
@@ -86,23 +102,41 @@ public class PinchBallLauncher : MonoBehaviour
             return;
         }
 
-        float pinchStrength = _hand.GetFingerPinchStrength(HandFinger.Index);
+        float strength = GetInputStrength();
 
-        // Hysteresis: once pinching, sustain until strength drops below release threshold
+        // Hysteresis: once holding, sustain until value drops below release threshold
         bool isPinching = _wasPinching
-            ? pinchStrength >= _pinchReleaseThreshold
-            : pinchStrength >= _pinchThreshold;
+            ? strength >= _pinchReleaseThreshold
+            : strength >= _pinchThreshold;
 
-        Vector3 pinchPos = GetPinchPosition();
+        Vector3 inputPos = GetInputPosition();
 
         if (isPinching && !_wasPinching)
-            OnPinchStart(pinchPos);
+            OnPinchStart(inputPos);
         else if (isPinching)
-            OnPinchHold(pinchPos);
+            OnPinchHold(inputPos);
         else if (_wasPinching)
-            OnPinchRelease(pinchPos);
+            OnPinchRelease(inputPos);
 
         _wasPinching = isPinching;
+    }
+
+    // --- Input abstraction: hand tracking or controller ----------------------
+
+    /// <summary>Returns index-trigger axis (controller) or pinch strength (hand tracking).</summary>
+    private float GetInputStrength()
+    {
+        if (UseController)
+            return OVRInput.Get(OVRInput.Axis1D.PrimaryIndexTrigger, OvrController);
+        return _hand?.GetFingerPinchStrength(HandFinger.Index) ?? 0f;
+    }
+
+    /// <summary>Returns the grab point in world space from whichever input is active.</summary>
+    private Vector3 GetInputPosition()
+    {
+        if (UseController)
+            return _controllerAnchor != null ? _controllerAnchor.position : transform.position;
+        return GetPinchPosition();
     }
 
     // -----------------------------------------------------------------------
