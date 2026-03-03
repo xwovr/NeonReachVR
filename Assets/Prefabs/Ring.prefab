@@ -14,6 +14,7 @@ GameObject:
   - component: {fileID: 5117475290203611100}
   - component: {fileID: 3071856603457819111}
   - component: {fileID: 5813959797923177472}
+  - component: {fileID: 4797280731712752829}
   m_Layer: 0
   m_Name: Ring
   m_TagString: Untagged
@@ -143,6 +144,33 @@ MonoBehaviour:
   _cubeSize: 0.035
   _lifetime: 2
   _cubeMaterial: {fileID: 2100000, guid: bbf3808913c5b4f6db93d753e5dce4f2, type: 2}
+--- !u!54 &4797280731712752829
+Rigidbody:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 802449189814120166}
+  serializedVersion: 5
+  m_Mass: 1
+  m_LinearDamping: 0
+  m_AngularDamping: 0.05
+  m_CenterOfMass: {x: 0, y: 0, z: 0}
+  m_InertiaTensor: {x: 1, y: 1, z: 1}
+  m_InertiaRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ImplicitCom: 1
+  m_ImplicitTensor: 1
+  m_UseGravity: 0
+  m_IsKinematic: 1
+  m_Interpolate: 0
+  m_Constraints: 0
+  m_CollisionDetection: 0
 --- !u!1 &923275713474890676
 GameObject:
   m_ObjectHideFlags: 0
