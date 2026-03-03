@@ -23,6 +23,12 @@ public class PinchBallLauncher : MonoBehaviour
     [SerializeField] private float _maxPullDistance = 0.35f;
     [SerializeField] [Range(0f, 1f)] private float _pinchThreshold = 0.85f;
 
+    [Header("Aiming")]
+    [Tooltip("How quickly the aim direction tracks wrist tilt while holding the pinch.")]
+    [SerializeField] private float _aimSmoothSpeed = 12f;
+    [Tooltip("Degrees to rotate aim upward to compensate for natural hand droop in a pinch pose.")]
+    [SerializeField] private float _aimAngleOffset = 15f;
+
     // Runtime refs (auto-found in Start)
     private IHand _hand;
     private Transform _centerEyeAnchor;
@@ -32,6 +38,7 @@ public class PinchBallLauncher : MonoBehaviour
     private Material   _activeMaterial;
     private Vector3 _pinchOrigin;
     private Vector3 _aimDirection;
+    private Vector3 _chargeAxis;   // Locked at pinch-start; charge stays consistent while aim updates
     private bool _wasPinching;
 
     private void Start()
@@ -77,10 +84,9 @@ private void OnPinchStart(Vector3 pinchPos)
         if (_activeBall != null)
             Destroy(_activeBall);
 
-        _pinchOrigin = pinchPos;
-        _aimDirection = _centerEyeAnchor != null
-            ? (pinchPos - _centerEyeAnchor.position).normalized
-            : transform.forward;
+        _pinchOrigin  = pinchPos;
+        _aimDirection = GetAimDirection(pinchPos);
+        _chargeAxis   = _aimDirection; // Charge axis locks at start so pull-back stays consistent
 
         _activeBall = SpawnBall(pinchPos);
         SetChargeColor(0f);
@@ -89,6 +95,10 @@ private void OnPinchStart(Vector3 pinchPos)
 private void OnPinchHold(Vector3 pinchPos)
     {
         if (_activeBall == null) return;
+
+        // Smoothly track wrist tilt so the player can steer aim while holding the pinch
+        _aimDirection = Vector3.Slerp(_aimDirection, GetAimDirection(pinchPos),
+                                      Time.deltaTime * _aimSmoothSpeed);
 
         _activeBall.transform.position = pinchPos;
 
@@ -115,11 +125,40 @@ private void OnPinchRelease(Vector3 pinchPos)
         _activeMaterial = null;
     }
 
-    /// <summary>Charge = how far the hand has pulled back opposite to aim direction.</summary>
+    /// <summary>Charge = how far the hand has pulled back along the locked charge axis.</summary>
     private float ComputeCharge(Vector3 currentPos)
     {
-        float pullBack = Vector3.Dot(_pinchOrigin - currentPos, _aimDirection);
+        float pullBack = Vector3.Dot(_pinchOrigin - currentPos, _chargeAxis);
         return Mathf.Clamp(pullBack, 0f, _maxPullDistance);
+    }
+
+    /// <summary>
+    /// Returns the live aim direction driven by the hand's pointer pose orientation.
+    /// Tilting the wrist back raises aim; tilting forward lowers it.
+    /// Falls back to eye→hand direction if pointer pose is unavailable.
+    /// </summary>
+    private Vector3 GetAimDirection(Vector3 pinchPos)
+    {
+        if (_hand.GetPointerPose(out Pose pointerPose))
+        {
+            Vector3 dir = pointerPose.forward;
+
+            // Compensate for the natural downward droop of the hand in a pinch pose
+            if (Mathf.Abs(_aimAngleOffset) > 0.01f)
+            {
+                Vector3 right = Vector3.Cross(Vector3.up, dir).normalized;
+                if (right.sqrMagnitude > 0.01f)
+                    dir = Quaternion.AngleAxis(-_aimAngleOffset, right) * dir;
+            }
+
+            return dir;
+        }
+
+        // Fallback: shoot from eye through pinch point
+        if (_centerEyeAnchor != null)
+            return (pinchPos - _centerEyeAnchor.position).normalized;
+
+        return transform.forward;
     }
 
     /// <summary>Returns the midpoint of the thumb tip and index tip in world space.</summary>
