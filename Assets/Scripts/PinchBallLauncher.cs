@@ -2,51 +2,50 @@ using UnityEngine;
 using Oculus.Interaction.Input;
 
 /// <summary>
-/// Detects a thumb-index pinch via ISDK Hand tracking, spawns a ball at the
-/// pinch point, and keeps it attached while the user holds the pinch.
-/// Pulling back (opposite the aim direction) charges launch power.
-/// Releasing the pinch launches the ball; it auto-destroys after 5 seconds.
+/// Pinch to hold a ball. Swing your hand from the pinch origin — a line renderer
+/// traces that swing vector, and the ball launches in the direction of that line
+/// when you release. A ribbon trail follows the ball (shows the swing gesture while
+/// held, then the throw arc after release).
 /// Add one instance per hand (set Handedness to Left or Right).
 /// </summary>
 public class PinchBallLauncher : MonoBehaviour
 {
     [Header("Hand")]
-    [Tooltip("Which hand this launcher belongs to. Used to auto-find the ISDK Hand component.")]
+    [Tooltip("Which hand this launcher belongs to.")]
     [SerializeField] private Handedness _handedness = Handedness.Left;
 
     [Header("Ball")]
     [SerializeField] private GameObject _ballPrefab;
-    [SerializeField] private float _ballScale = 0.04f;
+    [SerializeField] private float      _ballScale = 0.04f;
+    [SerializeField] private Material   _ballTrailMaterial; // assign BallTrail.mat
 
     [Header("Launch")]
-    [SerializeField] private float _launchMultiplier = 20f;
-    [SerializeField] private float _maxPullDistance = 0.35f;
+    [SerializeField] private float _launchMultiplier    = 20f;
+    [SerializeField] private float _maxPullDistance     = 0.35f;
     [Tooltip("Pinch strength required to START holding a ball.")]
-    [SerializeField] [Range(0f, 1f)] private float _pinchThreshold = 0.85f;
-    [Tooltip("Pinch strength must drop BELOW this to release. Lower than _pinchThreshold to prevent jitter.")]
+    [SerializeField] [Range(0f, 1f)] private float _pinchThreshold        = 0.85f;
+    [Tooltip("Pinch strength must drop BELOW this to release.")]
     [SerializeField] [Range(0f, 1f)] private float _pinchReleaseThreshold = 0.5f;
 
-    [Header("Aiming")]
-    [Tooltip("How much wrist rotation steers the aim. 1 = 1:1, 0.5 = half sensitivity.")]
-    [SerializeField] [Range(0.1f, 2f)] private float _aimSensitivity = 1f;
+    [Header("Aim Line")]
+    [SerializeField] private float _aimLineWidth = 0.005f;
 
     // Runtime refs (auto-found in Start)
-    private IHand _hand;
-    private Transform _centerEyeAnchor;
+    private IHand        _hand;
+    private Transform    _centerEyeAnchor;
+    private LineRenderer _aimLine;
 
     // State
     private GameObject _activeBall;
     private Material   _activeMaterial;
     private Vector3    _pinchOrigin;
     private Vector3    _aimDirection;
-    private Vector3    _initialAimDirection;      // locked at pinch-start
-    private Quaternion _wristRotationAtPinchStart; // locked at pinch-start
-    private Vector3    _chargeAxis;               // locked at pinch-start
-    private bool _wasPinching;
+    private bool       _wasPinching;
 
-private void Start()
+    // -----------------------------------------------------------------------
+    private void Start()
     {
-        // Prefer the Hand on the parent hierarchy — launcher is a child of LeftInteractions / RightInteractions
+        // Prefer the Hand on the parent (launcher is a child of LeftInteractions / RightInteractions)
         _hand = GetComponentInParent<IHand>();
 
         // Fallback: search the whole scene filtered by handedness
@@ -54,24 +53,58 @@ private void Start()
         {
             foreach (var h in FindObjectsByType<Hand>(FindObjectsSortMode.None))
             {
-                if (h.Handedness == _handedness)
-                {
-                    _hand = h as IHand;
-                    break;
-                }
+                if (h.Handedness == _handedness) { _hand = h as IHand; break; }
             }
         }
 
-        // Auto-find center eye anchor from OVRCameraRig
         var rig = FindFirstObjectByType<OVRCameraRig>();
-        if (rig != null)
-            _centerEyeAnchor = rig.centerEyeAnchor;
+        if (rig != null) _centerEyeAnchor = rig.centerEyeAnchor;
 
         if (_hand == null)
             Debug.LogWarning($"[PinchBallLauncher] No ISDK Hand found for handedness: {_handedness}");
+
+        BuildAimLine();
     }
 
-private void Update()
+    private void BuildAimLine()
+    {
+        _aimLine = GetComponent<LineRenderer>() ?? gameObject.AddComponent<LineRenderer>();
+        _aimLine.positionCount     = 2;
+        _aimLine.startWidth        = _aimLineWidth;
+        _aimLine.endWidth          = _aimLineWidth * 0.35f;
+        _aimLine.useWorldSpace     = true;
+        _aimLine.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        _aimLine.receiveShadows    = false;
+        _aimLine.enabled           = false;
+
+        // Runtime material — cyan tint on the same TrailLine shader
+        var shader = Shader.Find("Custom/TrailLine");
+        if (shader != null)
+        {
+            var mat = new Material(shader) { name = "AimLine_Runtime" };
+            mat.SetColor("_Color", new Color(0.15f, 0.85f, 1f, 1f));
+            _aimLine.material = mat;
+        }
+
+        // Opaque cyan at origin → fades out at the hand end
+        var gradient = new Gradient();
+        gradient.SetKeys(
+            new GradientColorKey[]
+            {
+                new GradientColorKey(new Color(0.2f, 0.9f, 1f), 0f),
+                new GradientColorKey(new Color(0.1f, 0.6f, 1f), 1f),
+            },
+            new GradientAlphaKey[]
+            {
+                new GradientAlphaKey(1f,   0f),
+                new GradientAlphaKey(0.3f, 1f),
+            }
+        );
+        _aimLine.colorGradient = gradient;
+    }
+
+    // -----------------------------------------------------------------------
+    private void Update()
     {
         if (_hand == null) return;
 
@@ -81,6 +114,7 @@ private void Update()
             if (_wasPinching)
             {
                 if (_activeBall != null) { Destroy(_activeBall); _activeBall = null; _activeMaterial = null; }
+                if (_aimLine != null) _aimLine.enabled = false;
                 _wasPinching = false;
             }
             return;
@@ -105,40 +139,41 @@ private void Update()
         _wasPinching = isPinching;
     }
 
-private void OnPinchStart(Vector3 pinchPos)
+    // -----------------------------------------------------------------------
+    private void OnPinchStart(Vector3 pinchPos)
     {
-        if (_activeBall != null)
-            Destroy(_activeBall);
+        if (_activeBall != null) Destroy(_activeBall);
 
-        _pinchOrigin = pinchPos;
-        _initialAimDirection = _centerEyeAnchor != null
+        _pinchOrigin  = pinchPos;
+
+        // Default aim = eye → pinch point; updated each frame in OnPinchHold
+        _aimDirection = _centerEyeAnchor != null
             ? (pinchPos - _centerEyeAnchor.position).normalized
             : transform.forward;
 
-        _aimDirection = _initialAimDirection;
-        _chargeAxis   = _initialAimDirection; // charge axis stays locked so pull-back feels consistent
-
-        // Record wrist rotation as the rotation reference point
-        _wristRotationAtPinchStart = _hand.GetJointPose(HandJointId.HandWristRoot, out Pose wristStart)
-            ? wristStart.rotation
-            : Quaternion.identity;
-
         _activeBall = SpawnBall(pinchPos);
         SetChargeColor(0f);
+
+        // Show aim line (zero-length at start — grows as hand moves)
+        _aimLine.SetPosition(0, _pinchOrigin);
+        _aimLine.SetPosition(1, _pinchOrigin);
+        _aimLine.enabled = true;
     }
 
-private void OnPinchHold(Vector3 pinchPos)
+    private void OnPinchHold(Vector3 pinchPos)
     {
         if (_activeBall == null) return;
 
-        // Rotate aim by however much the wrist has rotated since pinch-start
-        if (_hand.GetJointPose(HandJointId.HandWristRoot, out Pose wristCurrent))
-        {
-            Quaternion delta = wristCurrent.rotation * Quaternion.Inverse(_wristRotationAtPinchStart);
-            Quaternion scaledDelta = Quaternion.Slerp(Quaternion.identity, delta, _aimSensitivity);
-            _aimDirection = (scaledDelta * _initialAimDirection).normalized;
-        }
+        // Line: origin → current hand position
+        _aimLine.SetPosition(0, _pinchOrigin);
+        _aimLine.SetPosition(1, pinchPos);
 
+        // Aim direction = direction of the line
+        Vector3 delta = pinchPos - _pinchOrigin;
+        if (delta.sqrMagnitude > 0.0001f)
+            _aimDirection = delta.normalized;
+
+        // Ball stays at hand position — trail traces the swing gesture
         _activeBall.transform.position = pinchPos;
 
         float t = ComputeCharge(pinchPos) / _maxPullDistance;
@@ -146,46 +181,45 @@ private void OnPinchHold(Vector3 pinchPos)
         SetChargeColor(t);
     }
 
-private void OnPinchRelease(Vector3 pinchPos)
+    private void OnPinchRelease(Vector3 pinchPos)
     {
         if (_activeBall == null) return;
+
+        _aimLine.enabled = false;
 
         float charge = ComputeCharge(pinchPos);
         var rb = _activeBall.GetComponent<Rigidbody>();
         if (rb != null)
         {
-            rb.isKinematic = false;
-            rb.useGravity = true;
+            rb.isKinematic    = false;
+            rb.useGravity     = true;
             rb.linearVelocity = _aimDirection * (charge * _launchMultiplier);
         }
 
         Destroy(_activeBall, 5f);
-        _activeBall   = null;
+        _activeBall     = null;
         _activeMaterial = null;
     }
 
-    /// <summary>Charge = how far the hand has pulled back along the locked charge axis.</summary>
+    // -----------------------------------------------------------------------
+    /// <summary>Charge = distance moved from pinch origin, clamped to max.</summary>
     private float ComputeCharge(Vector3 currentPos)
-    {
-        float pullBack = Vector3.Dot(_pinchOrigin - currentPos, _chargeAxis);
-        return Mathf.Clamp(pullBack, 0f, _maxPullDistance);
-    }
+        => Mathf.Clamp((currentPos - _pinchOrigin).magnitude, 0f, _maxPullDistance);
 
-    /// <summary>Returns the midpoint of the thumb tip and index tip in world space.</summary>
+    /// <summary>Returns the midpoint of thumb tip and index tip in world space.</summary>
     private Vector3 GetPinchPosition()
     {
         if (_hand.GetJointPose(HandJointId.HandThumbTip, out Pose thumbPose) &&
             _hand.GetJointPose(HandJointId.HandIndexTip, out Pose indexPose))
             return (thumbPose.position + indexPose.position) * 0.5f;
 
-        // Fallback to pointer pose (the hand's aim ray origin)
         if (_hand.GetPointerPose(out Pose pointerPose))
             return pointerPose.position;
 
         return transform.position;
     }
 
-private GameObject SpawnBall(Vector3 position)
+    private GameObject SpawnBall(Vector3 position)
     {
         if (_ballPrefab == null)
         {
@@ -196,24 +230,54 @@ private GameObject SpawnBall(Vector3 position)
         var ball = Instantiate(_ballPrefab, position, Quaternion.identity);
         ball.transform.localScale = Vector3.one * _ballScale;
 
-        // Grab the shared material instance so we can tint it per-ball
+        // Per-instance material for charge colour tinting
         var rend = ball.GetComponent<Renderer>();
         if (rend != null)
-            _activeMaterial = rend.material; // .material creates a per-instance copy
+            _activeMaterial = rend.material;
 
         // Start kinematic — physics enabled on release
         var rb = ball.GetComponent<Rigidbody>();
-        if (rb != null)
-        {
-            rb.isKinematic = true;
-            rb.useGravity  = false;
-        }
+        if (rb != null) { rb.isKinematic = true; rb.useGravity = false; }
+
+        ConfigureTrail(ball.GetComponent<TrailRenderer>());
 
         return ball;
     }
 
+    private void ConfigureTrail(TrailRenderer trail)
+    {
+        if (trail == null) return;
 
-/// <summary>Lerps CoreColor and RimColor from red (t=0) to green (t=1).</summary>
+        trail.time              = 0.55f;
+        trail.startWidth        = 0.055f;  // wide ribbon matching reference images
+        trail.endWidth          = 0.004f;  // tapers to thin at the tail
+        trail.minVertexDistance = 0.004f;
+        trail.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        trail.receiveShadows    = false;
+
+        if (_ballTrailMaterial != null)
+            trail.material = _ballTrailMaterial;
+
+        // Bright yellow → orange → red-orange, fading to transparent at tail
+        var gradient = new Gradient();
+        gradient.SetKeys(
+            new GradientColorKey[]
+            {
+                new GradientColorKey(new Color(1.0f, 0.95f, 0.25f), 0.00f), // bright yellow (ball end)
+                new GradientColorKey(new Color(1.0f, 0.55f, 0.05f), 0.45f), // orange mid
+                new GradientColorKey(new Color(1.0f, 0.15f, 0.00f), 1.00f), // red-orange tail
+            },
+            new GradientAlphaKey[]
+            {
+                new GradientAlphaKey(1.0f, 0.00f),
+                new GradientAlphaKey(0.7f, 0.45f),
+                new GradientAlphaKey(0.0f, 1.00f),
+            }
+        );
+        trail.colorGradient = gradient;
+    }
+
+    /// <summary>Lerps CoreColor and RimColor from red (t=0) to green (t=1).</summary>
     private void SetChargeColor(float t)
     {
         if (_activeMaterial == null) return;
