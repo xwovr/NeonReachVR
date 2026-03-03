@@ -8,6 +8,15 @@ public class RingSpawner : MonoBehaviour
     [SerializeField] private GameObject  _ringPrefab;
     [SerializeField] private Transform[] _spawnPoints;
 
+    [Header("Weaving Ring")]
+    [SerializeField] private GameObject _weavingRingPrefab;
+    [Tooltip("Number of normal rings that spawn before one weaving ring appears.")]
+    [SerializeField] private int   _waveSize         = 18;
+    [SerializeField] private float _lateralAmplitude = 0.9f;
+    [Tooltip("Oscillations per second (0.25 = one full sweep every 4 s).")]
+    [SerializeField] private float _lateralFrequency = 0.25f;
+
+
     [Header("Difficulty")]
     [SerializeField] private float _baseSpeed          = 1.5f;
     [SerializeField] private float _maxSpeed           = 5.5f;
@@ -19,6 +28,8 @@ public class RingSpawner : MonoBehaviour
     private float _gameTimer;
     private bool  _spawning;
     private int   _lastIndex = -1;
+    private int   _spawnedInWave;
+
     private readonly List<GameObject> _activeRings = new();
 
     private void Start()
@@ -50,11 +61,20 @@ public class RingSpawner : MonoBehaviour
         if (_spawning) _gameTimer += Time.deltaTime;
     }
 
-    private IEnumerator SpawnLoop()
+private IEnumerator SpawnLoop()
     {
         while (_spawning)
         {
             SpawnRing();
+            _spawnedInWave++;
+
+            if (_spawnedInWave >= _waveSize)
+            {
+                _spawnedInWave = 0;
+                yield return new WaitForSeconds(ComputeInterval());
+                SpawnWeavingRing();
+            }
+
             yield return new WaitForSeconds(ComputeInterval());
         }
     }
@@ -80,6 +100,31 @@ public class RingSpawner : MonoBehaviour
         }
     }
 
+private void SpawnWeavingRing()
+    {
+        if (_weavingRingPrefab == null || _spawnPoints == null || _spawnPoints.Length == 0) return;
+
+        int idx;
+        do { idx = Random.Range(0, _spawnPoints.Length); }
+        while (_spawnPoints.Length > 1 && idx == _lastIndex);
+        _lastIndex = idx;
+
+        var ring = Instantiate(_weavingRingPrefab, _spawnPoints[idx].position,
+                               Quaternion.LookRotation(Vector3.back, Vector3.up));
+        _activeRings.Add(ring);
+
+        var rb = ring.GetComponent<RingBehavior>();
+        if (rb != null)
+        {
+            rb.MoveSpeed        = ComputeSpeed();
+            rb.MissZThreshold   = _missZThreshold;
+            rb.IsWeaving        = true;
+            rb.LateralAmplitude = _lateralAmplitude;
+            rb.LateralFrequency = _lateralFrequency;
+        }
+    }
+
+
     private float Smoothstep() { float t = Mathf.Clamp01(_gameTimer / _rampDuration); return t * t * (3f - 2f * t); }
     private float ComputeSpeed()    => Mathf.Lerp(_baseSpeed, _maxSpeed, Smoothstep());
     private float ComputeInterval() => Mathf.Lerp(_baseSpawnInterval, _minSpawnInterval, Smoothstep());
@@ -96,8 +141,9 @@ public class RingSpawner : MonoBehaviour
     {
         foreach (var r in _activeRings) if (r) Destroy(r);
         _activeRings.Clear();
-        _lastIndex = -1;
-        _gameTimer = 0f;
+        _lastIndex     = -1;
+        _spawnedInWave = 0;
+        _gameTimer     = 0f;
         _spawning  = true;
         StartCoroutine(SpawnLoop());
     }

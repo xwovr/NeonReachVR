@@ -16,7 +16,7 @@ GameObject:
   - component: {fileID: 5813959797923177472}
   - component: {fileID: 4797280731712752829}
   m_Layer: 0
-  m_Name: Ring
+  m_Name: WeavingRing
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -73,7 +73,7 @@ MeshRenderer:
   m_RenderingLayerMask: 1
   m_RendererPriority: 0
   m_Materials:
-  - {fileID: 2100000, guid: bbf3808913c5b4f6db93d753e5dce4f2, type: 2}
+  - {fileID: 2100000, guid: 9be0992dfdad84c968261b2ca5ab5e7b, type: 2}
   m_StaticBatchInfo:
     firstSubMesh: 0
     subMeshCount: 0

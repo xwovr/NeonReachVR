@@ -1274,6 +1274,10 @@ MonoBehaviour:
   - {fileID: 1497482735}
   - {fileID: 1599653669}
   - {fileID: 332693644}
+  _weavingRingPrefab: {fileID: 802449189814120166, guid: 8fd6735fa5c194bb1b2c48d4b6f657b2, type: 3}
+  _waveSize: 6
+  _lateralAmplitude: 1.5
+  _lateralFrequency: 0.25
   _baseSpeed: 1.5
   _maxSpeed: 5.5
   _baseSpawnInterval: 2.5
@@ -3549,9 +3553,7 @@ MonoBehaviour:
   m_OnCullStateChanged:
     m_PersistentCalls:
       m_Calls: []
-  m_text: 'GAME OVER
-
-    <size=26>Score: 0  |  Missed: 0 / 10</size>'
+  m_text: GAME OVER
   m_isRightToLeft: 0
   m_fontAsset: {fileID: 11400000, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
   m_sharedMaterial: {fileID: 2180264, guid: 8f586378b4e144a9851e7b34d9b748ee, type: 2}
@@ -3560,8 +3562,8 @@ MonoBehaviour:
   m_fontMaterials: []
   m_fontColor32:
     serializedVersion: 2
-    rgba: 4279913727
-  m_fontColor: {r: 1, g: 0.3, b: 0.1, a: 1}
+    rgba: 4282551551
+  m_fontColor: {r: 1, g: 0.54901963, b: 0.25882354, a: 1}
   m_enableVertexGradient: 0
   m_colorMode: 3
   m_fontColorGradient:
