@@ -17,13 +17,10 @@ Shader "Custom/TrailLine"
 
         Pass
         {
-            // SRPDefaultUnlit tells URP to always render this pass for
-            // unlit transparent effects (particles, trails, line renderers).
-            // Without this tag the pass is silently skipped on Android/Quest.
             Name "SRPDefaultUnlit"
             Tags { "LightMode" = "SRPDefaultUnlit" }
 
-            Blend SrcAlpha One   // Additive — warm glow
+            Blend SrcAlpha One
             ZWrite Off
             Cull Off
 
@@ -56,6 +53,7 @@ Shader "Custom/TrailLine"
                 float4 positionHCS : SV_POSITION;
                 half4  color       : COLOR;
                 float2 uv          : TEXCOORD0;
+                UNITY_VERTEX_INPUT_INSTANCE_ID   // needed so instanceID can be transferred and read in frag
                 UNITY_VERTEX_OUTPUT_STEREO
             };
 
@@ -74,6 +72,7 @@ Shader "Custom/TrailLine"
 
             half4 frag(Varyings IN) : SV_Target
             {
+                UNITY_SETUP_INSTANCE_ID(IN);
                 UNITY_SETUP_STEREO_EYE_INDEX_POST_VERTEX(IN);
                 half4 tex = SAMPLE_TEXTURE2D(_MainTex, sampler_MainTex, IN.uv);
                 return IN.color * tex;

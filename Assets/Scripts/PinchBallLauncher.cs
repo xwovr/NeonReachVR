@@ -35,11 +35,12 @@ public class PinchBallLauncher : MonoBehaviour
     private Transform _centerEyeAnchor;
 
     // State
-    private GameObject _activeBall;
-    private Material   _activeMaterial;
-    private Vector3    _pinchOrigin;
-    private Vector3    _aimDirection;
-    private bool       _wasPinching;
+    private GameObject   _activeBall;
+    private Material     _activeMaterial;
+    private TrailRenderer _activeTrail;
+    private Vector3      _pinchOrigin;
+    private Vector3      _aimDirection;
+    private bool         _wasPinching;
 
     // -----------------------------------------------------------------------
     private void Start()
@@ -78,7 +79,7 @@ public class PinchBallLauncher : MonoBehaviour
         {
             if (_wasPinching)
             {
-                if (_activeBall != null) { Destroy(_activeBall); _activeBall = null; _activeMaterial = null; }
+                if (_activeBall != null) { Destroy(_activeBall); _activeBall = null; _activeMaterial = null; _activeTrail = null; }
                 if (_aimLine != null) _aimLine.enabled = false;
                 _wasPinching = false;
             }
@@ -161,9 +162,13 @@ public class PinchBallLauncher : MonoBehaviour
             rb.linearVelocity = _aimDirection * (charge * _launchMultiplier);
         }
 
+        // Start the trail now that the ball is in flight
+        if (_activeTrail != null) _activeTrail.emitting = true;
+
         Destroy(_activeBall, 5f);
         _activeBall     = null;
         _activeMaterial = null;
+        _activeTrail    = null;
     }
 
     // -----------------------------------------------------------------------
@@ -204,7 +209,8 @@ public class PinchBallLauncher : MonoBehaviour
         var rb = ball.GetComponent<Rigidbody>();
         if (rb != null) { rb.isKinematic = true; rb.useGravity = false; }
 
-        ConfigureTrail(ball.GetComponent<TrailRenderer>());
+        _activeTrail = ball.GetComponent<TrailRenderer>();
+        ConfigureTrail(_activeTrail);
 
         return ball;
     }
@@ -213,6 +219,7 @@ public class PinchBallLauncher : MonoBehaviour
     {
         if (trail == null) return;
 
+        trail.emitting          = false;   // trail only starts after launch
         trail.time              = 0.55f;
         trail.startWidth        = 0.055f;  // wide ribbon matching reference images
         trail.endWidth          = 0.004f;  // tapers to thin at the tail
