@@ -1,3 +1,4 @@
+using System.Collections;
 using TMPro;
 using UnityEngine;
 
@@ -12,6 +13,7 @@ public class GameUI : MonoBehaviour
     [SerializeField] private TextMeshProUGUI _gameOverText;
 
     private Transform _playerEye;
+    private Coroutine _countdownCoroutine;
 
     private void Start()
     {
@@ -29,6 +31,7 @@ public class GameUI : MonoBehaviour
             GameManager.Instance.OnScoreChanged  += RefreshScore;
             GameManager.Instance.OnMissedChanged += RefreshMissed;
             GameManager.Instance.OnGameOver      += ShowGameOver;
+            GameManager.Instance.OnGameRestart   += HideGameOver;
         }
     }
 
@@ -39,6 +42,7 @@ public class GameUI : MonoBehaviour
             GameManager.Instance.OnScoreChanged  -= RefreshScore;
             GameManager.Instance.OnMissedChanged -= RefreshMissed;
             GameManager.Instance.OnGameOver      -= ShowGameOver;
+            GameManager.Instance.OnGameRestart   -= HideGameOver;
         }
     }
 
@@ -59,6 +63,28 @@ public class GameUI : MonoBehaviour
     private void ShowGameOver(int finalScore, int missedCount)
     {
         _gameOverPanel.SetActive(true);
-        _gameOverText.text = $"GAME OVER\n<size=26>Score: {finalScore}  |  Missed: {missedCount} / 10</size>";
+        if (_countdownCoroutine != null) StopCoroutine(_countdownCoroutine);
+        _countdownCoroutine = StartCoroutine(GameOverCountdown(finalScore, missedCount));
+    }
+
+    private IEnumerator GameOverCountdown(int finalScore, int missedCount)
+    {
+        for (int t = 10; t > 0; t--)
+        {
+            _gameOverText.text = $"GAME OVER\n<size=26>Score: {finalScore}  |  Missed: {missedCount} / 10\nRestarting in {t}...</size>";
+            yield return new WaitForSeconds(1f);
+        }
+        _countdownCoroutine = null;
+        GameManager.Instance?.Restart();
+    }
+
+    private void HideGameOver()
+    {
+        if (_countdownCoroutine != null)
+        {
+            StopCoroutine(_countdownCoroutine);
+            _countdownCoroutine = null;
+        }
+        _gameOverPanel.SetActive(false);
     }
 }

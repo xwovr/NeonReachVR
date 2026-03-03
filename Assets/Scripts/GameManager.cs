@@ -15,6 +15,7 @@ public class GameManager : MonoBehaviour
     public event Action<int>      OnScoreChanged;   // new score
     public event Action<int, int> OnMissedChanged;  // (missedCount, maxMissed)
     public event Action<int, int> OnGameOver;       // (finalScore, missedCount)
+    public event Action           OnGameRestart;
 
     private void Awake()
     {
@@ -39,5 +40,15 @@ public class GameManager : MonoBehaviour
             IsGameOver = true;
             OnGameOver?.Invoke(Score, MissedRings);
         }
+    }
+
+    public void Restart()
+    {
+        Score       = 0;
+        MissedRings = 0;
+        IsGameOver  = false;
+        OnScoreChanged?.Invoke(Score);
+        OnMissedChanged?.Invoke(MissedRings, _maxMissedRings);
+        OnGameRestart?.Invoke();
     }
 }

@@ -27,7 +27,10 @@ public class RingSpawner : MonoBehaviour
             Destroy(p.gameObject);
 
         if (GameManager.Instance != null)
-            GameManager.Instance.OnGameOver += HandleGameOver;
+        {
+            GameManager.Instance.OnGameOver    += HandleGameOver;
+            GameManager.Instance.OnGameRestart += HandleGameRestart;
+        }
 
         _spawning = true;
         StartCoroutine(SpawnLoop());
@@ -36,7 +39,10 @@ public class RingSpawner : MonoBehaviour
     private void OnDestroy()
     {
         if (GameManager.Instance != null)
-            GameManager.Instance.OnGameOver -= HandleGameOver;
+        {
+            GameManager.Instance.OnGameOver    -= HandleGameOver;
+            GameManager.Instance.OnGameRestart -= HandleGameRestart;
+        }
     }
 
     private void Update()
@@ -84,5 +90,15 @@ public class RingSpawner : MonoBehaviour
         StopAllCoroutines();
         foreach (var r in _activeRings) if (r) Destroy(r);
         _activeRings.Clear();
+    }
+
+    private void HandleGameRestart()
+    {
+        foreach (var r in _activeRings) if (r) Destroy(r);
+        _activeRings.Clear();
+        _lastIndex = -1;
+        _gameTimer = 0f;
+        _spawning  = true;
+        StartCoroutine(SpawnLoop());
     }
 }
