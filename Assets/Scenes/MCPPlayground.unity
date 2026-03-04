@@ -2631,7 +2631,9 @@ MonoBehaviour:
   _backgroundMusic: {fileID: 8300000, guid: 22b5572c352704990b4ea72c7735aaf3, type: 3}
   _musicVolume: 0.4
   _ringHitSFX: {fileID: 8300000, guid: 7d86d2d826dcf4a928b22f2cb4958fde, type: 3}
-  _sfxVolume: 0.15
+  _ballLaunchSFX: {fileID: 8300000, guid: b857f1b6d31464696806011c9a066f02, type: 3}
+  _missSFX: {fileID: 8300000, guid: f1ccf3d679ea3465fb229aae050c7b08, type: 3}
+  _sfxVolume: 0.2
 --- !u!4 &1112511966
 Transform:
   m_ObjectHideFlags: 0

@@ -10,6 +10,8 @@ public class AudioManager : MonoBehaviour
 
     [Header("SFX")]
     [SerializeField] private AudioClip _ringHitSFX;
+    [SerializeField] private AudioClip _ballLaunchSFX;
+    [SerializeField] private AudioClip _missSFX;
     [SerializeField] [Range(0f, 1f)] private float _sfxVolume   = 1f;
 
     private AudioSource _musicSource;
@@ -40,13 +42,31 @@ public class AudioManager : MonoBehaviour
             _musicSource.Play();
 
         if (GameManager.Instance != null)
-            GameManager.Instance.OnScoreChanged += OnScoreChanged;
+        {
+            GameManager.Instance.OnScoreChanged  += OnScoreChanged;
+            GameManager.Instance.OnMissedChanged += OnMissedChanged;
+        }
     }
 
     private void OnDestroy()
     {
         if (GameManager.Instance != null)
-            GameManager.Instance.OnScoreChanged -= OnScoreChanged;
+        {
+            GameManager.Instance.OnScoreChanged  -= OnScoreChanged;
+            GameManager.Instance.OnMissedChanged -= OnMissedChanged;
+        }
+    }
+
+    public void PlayLaunchSFX()
+    {
+        if (_ballLaunchSFX != null)
+            _sfxSource.PlayOneShot(_ballLaunchSFX, _sfxVolume);
+    }
+
+    private void OnMissedChanged(int missed, int max)
+    {
+        if (_missSFX != null)
+            _sfxSource.PlayOneShot(_missSFX, _sfxVolume);
     }
 
     private void OnScoreChanged(int _)

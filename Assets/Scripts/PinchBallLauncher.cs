@@ -227,6 +227,8 @@ public class PinchBallLauncher : MonoBehaviour
             rb.linearVelocity = _aimDirection * (charge * _launchMultiplier);
         }
 
+        AudioManager.Instance?.PlayLaunchSFX();
+
         // Start the trail now that the ball is in flight
         if (_activeTrail != null) _activeTrail.emitting = true;
 
