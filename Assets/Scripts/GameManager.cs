@@ -28,10 +28,10 @@ public class GameManager : MonoBehaviour
         HighScore = PlayerPrefs.GetInt(HighScoreKey, 0);
     }
 
-    public void AddScore()
+public void AddScore(int points = 1)
     {
         if (IsGameOver) return;
-        Score++;
+        Score += points;
         OnScoreChanged?.Invoke(Score);
         if (Score > HighScore)
         {

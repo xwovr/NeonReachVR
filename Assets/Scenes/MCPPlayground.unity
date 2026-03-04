@@ -1278,6 +1278,9 @@ MonoBehaviour:
   _waveSize: 6
   _lateralAmplitude: 1.5
   _lateralFrequency: 0.25
+  _rotatingRingPrefab: {fileID: 802449189814120166, guid: ff3ff9ac0527144768a7a59d357bf2d8, type: 3}
+  _rotatingRingChance: 0.2
+  _rotationSpeed: 45
   _baseSpeed: 1.5
   _maxSpeed: 5.5
   _baseSpawnInterval: 2.5
@@ -3115,6 +3118,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1370868606}
+  - component: {fileID: 1370868607}
   m_Layer: 0
   m_Name: Enclosure
   m_TagString: Untagged
@@ -3142,6 +3146,22 @@ Transform:
   - {fileID: 1555199075}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1370868607
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1370868605}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: db4fe379e3d3a4124be12db258b9a525, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GridAnimator
+  _minGridSize: 0.25
+  _missColor: {r: 1, g: 0, b: 0, a: 1}
+  _shrinkDuration: 0.2
+  _growDuration: 0.55
 --- !u!1 &1382728047
 GameObject:
   m_ObjectHideFlags: 0
