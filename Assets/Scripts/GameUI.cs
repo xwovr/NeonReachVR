@@ -6,7 +6,7 @@ public class GameUI : MonoBehaviour
 {
     [Header("HUD — always visible")]
     [SerializeField] private TextMeshProUGUI _scoreText;
-    [SerializeField] private TextMeshProUGUI _missedLiveText;
+    [SerializeField] private RectTransform   _healthBarFill;   // anchorMax.x: 1=full, 0=empty
 
     [Header("Game Over Panel (initially inactive)")]
     [SerializeField] private GameObject      _gameOverPanel;
@@ -64,8 +64,18 @@ public class GameUI : MonoBehaviour
 
     private void OnHighScoreUpdated(int _) => RefreshScore(GameManager.Instance?.Score ?? 0);
 
+    // missed=0,max=10 → anchorMax.x=1.0 (full bar)
+    // missed=5,max=10 → anchorMax.x=0.5 (half bar)
+    // missed=10,max=10 → anchorMax.x=0.0 (empty)
     private void RefreshMissed(int missed, int max)
-        => _missedLiveText.text = $"MISSED  <color=#FF8C42>{missed}</color> / {max}";
+    {
+        if (_healthBarFill != null)
+        {
+            Vector2 a = _healthBarFill.anchorMax;
+            a.x = 1f - (float)missed / max;
+            _healthBarFill.anchorMax = a;
+        }
+    }
 
     private void ShowGameOver(int finalScore, int missedCount)
     {
@@ -93,5 +103,8 @@ public class GameUI : MonoBehaviour
             _countdownCoroutine = null;
         }
         _gameOverPanel.SetActive(false);
+
+        int max = GameManager.Instance?.MaxMissedRings ?? 10;
+        RefreshMissed(0, max);
     }
 }
