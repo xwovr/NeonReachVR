@@ -37,6 +37,7 @@ public class PinchBallLauncher : MonoBehaviour
     private IHand     _hand;
     private Transform _centerEyeAnchor;
     private Transform _controllerAnchor;
+    private Transform _trackingSpace;
 
     // OVR controller for this handedness
     private OVRInput.Controller OvrController
@@ -77,6 +78,7 @@ public class PinchBallLauncher : MonoBehaviour
             _controllerAnchor = _handedness == Handedness.Right
                 ? rig.rightHandAnchor
                 : rig.leftHandAnchor;
+            _trackingSpace = rig.trackingSpace;
         }
 
         if (_hand == null)
@@ -157,7 +159,14 @@ public class PinchBallLauncher : MonoBehaviour
     private Vector3 GetInputPosition()
     {
         if (_activeSource == InputSource.Controller)
+        {
+            // Use OVRInput for physical controller position — works in concurrent mode
+            if (_trackingSpace != null)
+                return _trackingSpace.TransformPoint(
+                    OVRInput.GetLocalControllerPosition(OvrController));
+            // Fallback (should not reach here if rig was found)
             return _controllerAnchor != null ? _controllerAnchor.position : transform.position;
+        }
         return HandReady ? GetPinchPosition() : transform.position;
     }
 
