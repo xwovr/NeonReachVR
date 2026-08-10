@@ -1,7 +1,6 @@
 {
   "dependencies": {
     "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main",
-    "com.meta.xr.mcp.extension.coplaydev": "file:/Users/dilmerv/Code/ExternalPackages/com.meta.xr.mcp.extension.coplay",
     "com.meta.xr.sdk.interaction.ovr": "85.0.0",
     "com.unity.ai.navigation": "2.0.10",
     "com.unity.collab-proxy": "2.11.3",
