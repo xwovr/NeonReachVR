@@ -1,13 +1,17 @@
 # 🎮 Neon Reach VR
 
-This prototype was created purely using Claude CLI + Unity MCP + Meta MCP Extensions. It demonstrates what can be achieved through vibecoding features alone, and how our extensions and exposed LLM knowledge can accelerate VR developers' workflows.
+This prototype was created purely using Claude CLI + Unity MCP + [Meta MCP Extensions](https://github.com/meta-quest/Unity-MCP-Extensions). It demonstrates what can be achieved through agentic workflows features alone, and how our extensions and exposed LLM knowledge can accelerate VR developers' workflows.
+
+## How to run the project?
+Honestly, it’s that simple: clone it, open it in Unity, activate the Meta XR Simulator, hit Play, and you’re done! You can use hands or controllers to play the game and the arrow keys on your keyboard to move around.
 
 ## 💻 What stack was used to build this?
 
 - Claude Code CLI
 - Unity 6+ LTS
-- Meta XR Core SDK and Meta XR Interaction SDK
-- Coplay Unity MCP
+- Meta XR Core SDK
+- Meta XR Interaction SDK
+- Unity MCP
 - Meta Unity MCP Extensions
 
 |**Project Demos**|
