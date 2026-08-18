@@ -30,6 +30,8 @@ TagManager:
   - QDSUIBackplate
   - QDSUITextInputField
   - Ball
+  - QDSUILineDrawing
+  - QDSUIToggleThumbnail
   layers:
   - Default
   - TransparentFX
