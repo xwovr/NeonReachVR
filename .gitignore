@@ -78,3 +78,6 @@ crashlytics-build.properties
 .vscode/
 .idea
 .DS_Store
+Assets/Resources/DevAgentSettings.asset
+Assets/Resources/DevAgentSettings.asset.meta
+out/
