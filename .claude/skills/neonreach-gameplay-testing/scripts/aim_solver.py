@@ -14,7 +14,7 @@ pulls under-deliver their vertical component and miss beyond ~5 m. See
 SKILL.md "Verified vs. not verified".
 
 Model (measured against the running game):
-  * BallLauncher aim  = normalize(grabOrigin - releasePos)   [slingshot: pull back]
+  * PinchBallLauncher aim = normalize(grabOrigin - releasePos) [slingshot: pull back]
   * charge            = min(|grab - release|, 0.35)
   * launch speed      = charge * _launchMultiplier (80 in the scene) -> 28 m/s max
   * ball spawns at the release position, gravity -9.81, zero linear damping
@@ -217,7 +217,7 @@ def solve_angled(target_unity, hand="right", head=(0.0, HEAD_Y_DEFAULT := 1.70, 
 
 def rotation_warning(yaw_deg):
     """
-    RingHitZone projects the ball into the ScoreZone's LOCAL xy plane, but
+    RingScoreZone projects the ball into the ScoreZone's LOCAL xy plane, but
     OnTriggerEnter fires at the box boundary where local z is ~+/-0.40. For a
     ring yawed away from face-on, that depth leaks into local x as
     0.40*sin(yaw), eating into the 0.35 hole radius. Rings spawn at yaw 180
@@ -238,7 +238,7 @@ def main():
     ap.add_argument("--release-x-oxr", type=float, default=None)
     ap.add_argument("--release-z-oxr", type=float, default=DEFAULT_RELEASE_Z_OXR)
     ap.add_argument("--speed-mult", type=float, default=80.0,
-                    help="BallLauncher._launchMultiplier (scene value: 80)")
+                    help="PinchBallLauncher._launchMultiplier (scene value: 80)")
 
     ap.add_argument("--intercept", action="store_true",
                     help="target is a moving ring; requires --ring-pos")

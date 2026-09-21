@@ -3,7 +3,7 @@
 Plan a multi-ring volley in ONE freeze.
 
 While Time.timeScale == 0 a released ball keeps its armed velocity but does not
-move, and BallLauncher immediately clears _activeBall - so a single hand can arm
+move, and PinchBallLauncher immediately clears _activeBall - so a single hand can arm
 any number of balls back to back. Unfreeze once and they all fly together.
 
 This planner also interleaves the two hands. The four steps of a throw are

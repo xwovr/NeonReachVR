@@ -14,8 +14,8 @@ tags:
 
 # NeonReach VR — Gameplay Testing
 
-Test the ring-shooter loop (`BallLauncher` → ball → `RingHitZone` → `GameManager`)
-against the running game. Builds on **hz-meta-xr-operator** and
+Test the ring-shooter loop (`PinchBallLauncher` → ball → `RingScoreZone` →
+`GameManager`) against the running game. Builds on **hz-meta-xr-operator** and
 **hz-meta-xr-operator-unity-test-mechanics**; this skill adds the project
 numbers, the pose sequences, and the interception technique — all measured
 against the live build.
@@ -27,7 +27,7 @@ Rings spawn at Unity `z = +12` across 7 spawn points and travel `-Z` at
 controller **backward**, and releases — a slingshot, so **aim = `grabOrigin −
 releasePos`**. Charge is the pull distance clamped to 0.35 m; launch speed is
 `charge × _launchMultiplier`, and the scene sets the multiplier to **80**, so
-max muzzle speed is **28 m/s**. `RingHitZone` catches colliders tagged `Ball`
+max muzzle speed is **28 m/s**. `RingScoreZone` catches colliders tagged `Ball`
 in a 0.7×0.7×0.8 trigger box, then requires the ball centre within **0.35 m** of
 the ring's local XY origin. The ring has no solid collider — a ball that misses
 the hole passes straight through the rim.
@@ -51,22 +51,31 @@ their own hitbox. Worth raising separately.
 ## Bring-up
 
 1. **Activate the simulator.** It ships inside `com.meta.xr.sdk.core` (v205) and
-   is NOT active by default. Check with
-   `IReflectionService.InvokeStaticMethodFromJson(System.Environment,
-   GetEnvironmentVariable, {"variable": "XR_SELECTED_RUNTIME_JSON"})`. Empty →
-   run `UIVerificationTools.ExecuteMenuItem("Meta/Meta XR Simulator/Activate")`.
-   Requires `/Applications/MetaXRSimulator.app` (Apple Silicon only).
-   Do **not** call the `Status` menu item — it opens a blocking modal dialog.
-2. **Enter Play Mode.** `Edit/Play` is not a resolvable menu path. Use
-   `IReflectionService.InvokeStaticMethodFromJson(UnityEditor.EditorApplication,
-   EnterPlaymode, {})`, then wait ~10 s.
-3. **Confirm attach.** `openxr_get_session_info` should report
+   is NOT active by default.
+   - macOS: check `XR_SELECTED_RUNTIME_JSON` via `IReflectionService`; empty →
+     `UIVerificationTools.ExecuteMenuItem("Meta/Meta XR Simulator/Activate")`.
+     Requires `/Applications/MetaXRSimulator.app` (Apple Silicon only).
+     Do **not** call the `Status` menu item — it opens a blocking modal dialog.
+   - Windows: `HKLM:\SOFTWARE\Khronos\OpenXR\1\ActiveRuntime` must point at the
+     simulator JSON (`C:\Program Files\MetaXRSimulator\v207.0\meta_openxr_simulator.json`).
+     `activate_simulator.ps1` in the simulator install dir sets it (self-elevates).
+2. **Load the operator API layer (Windows only).** The layer is not registered by
+   default: set `XR_API_LAYER_PATH` to the
+   `meta-xr-operator-standalone-public/windows` folder and
+   `XR_ENABLE_API_LAYERS=XR_APILAYER_METAX_operator` **in the Unity process**
+   (`unity command eval` + `System.Environment.SetEnvironmentVariable`), then
+   restart Play Mode so `xrCreateInstance` picks it up. Without this every
+   `openxr_*` call fails with `Server unavailable` at the MCP transport layer.
+3. **Enter Play Mode.** macOS/MCP: `Edit/Play` is not a resolvable menu path —
+   use `IReflectionService` → `UnityEditor.EditorApplication.EnterPlaymode`.
+   Windows/Unity CLI: `unity command editor_play`. Then wait ~10 s.
+4. **Confirm attach.** `openxr_get_session_info` should report
    `XR_SESSION_STATE_FOCUSED`. Before that, every `openxr_*` call fails with
    `Server unavailable` at the MCP transport layer.
-4. **Check the profile.** `openxr_get_active_interaction_profile` must return a
-   touch controller. `BallLauncher` early-outs on
-   `OVRInput.IsControllerConnected`, so with no profile bound nothing happens
-   and every test silently "fails".
+5. **Check the profile.** `openxr_get_active_interaction_profile` must return a
+   touch controller (`/interaction_profiles/meta/touch_controller_plus`).
+   `PinchBallLauncher` early-outs on `OVRInput.IsControllerConnected`, so with
+   no profile bound nothing happens and every test silently "fails".
 
 ## Coordinates
 
@@ -136,7 +145,7 @@ is independent, so left and right can share a block.
 
 Compute poses with `scripts/aim_solver.py`, then issue exactly four calls.
 Never use `auto_release` — the press must span several frames so
-`OnTriggerPress` can latch `_grabOrigin`.
+`OnPinchStart` can latch `_pinchOrigin`.
 
 ```
 1. openxr_set_controller_pose  hand=<h> pose_type=grip base_space=local_floor
@@ -147,8 +156,8 @@ Never use `auto_release` — the press must span several frames so
 ```
 
 Both hands work identically; `--hand left|right` picks a sensible release X
-(`±0.20`). `BallLauncher_Left`/`_Right` are independent instances, so both hands
-can hold and throw simultaneously.
+(`±0.20`). `PinchBallLauncher_Left`/`_Right` are independent instances, so both
+hands can hold and throw simultaneously.
 
 **Always pull horizontally.** The solver keeps grab and release at the same
 height and pays for the ballistic drop by raising the launch. Angled pulls are
@@ -156,8 +165,8 @@ height and pays for the ballistic drop by raising the launch. Angled pulls are
 a predicted `(0, 14.0, 24.25)`), but flat pulls keep the launch clear of the
 player hitbox and need no elevation solve.
 
-Mid-throw introspection: after step 2 the ball spawns exactly at `_grabOrigin`;
-during step 3 `OnTriggerHold` parks it on the controller. So
+Mid-throw introspection: after step 2 the ball spawns exactly at `_pinchOrigin`;
+during step 3 `OnPinchHold` parks it on the controller. So
 `SearchGameObjects("PinchBall")` + `Transform.position` reveals both endpoints of
 the pull before you commit to the release.
 
@@ -169,7 +178,8 @@ removes agent turn latency entirely:
 | Path | Round trip |
 |---|---|
 | agent turn | 10–15 s |
-| unity bridge, HTTP POST to `127.0.0.1:48736/mcpbridge/` + Bearer token | ~11 ms |
+| unity bridge, HTTP POST to `127.0.0.1:48736/mcpbridge/` + Bearer token (macOS) | ~11 ms |
+| unity pipeline, HTTP POST to the pipeline server + descriptor token (Windows, no MCP) | ~30 ms |
 | operator, stdio to `meta-xr-operator-mcp-proxy` | 1–3 ms |
 | `unity_get_world_pose` (operator → Unity → back) | ~16 ms |
 
@@ -186,13 +196,14 @@ game and it plays itself unattended for that whole window — one run opened wit
 
 ```
 # agent: set_timeScale(0)  ->  GameManager.Restart()  ->  then launch
-python3 play.py --max-seconds 240                 # stops at game over, re-pauses
-python3 play.py --max-seconds 240 --play-seconds 60  # play 60 s, then go idle
-python3 play.py --max-seconds 60 --dry-run        # observe and decide only
-python3 play.py --pause-at 30                     # freeze 30 s in
-python3 play.py --pause-on-miss                   # freeze the instant one gets past
-python3 play.py --keep-running                    # leave running at exit
-kill -USR1 $(cat /tmp/neonreach_play.pid)         # toggle pause/resume any time
+python play.py --max-seconds 240                 # stops at game over, re-pauses
+python play.py --max-seconds 240 --play-seconds 60  # play 60 s, then go idle
+python play.py --max-seconds 60 --dry-run        # observe and decide only
+python play.py --pause-at 30                     # freeze 30 s in
+python play.py --pause-on-miss                   # freeze the instant one gets past
+python play.py --keep-running                    # leave running at exit
+kill -USR1 $(cat /tmp/neonreach_play.pid)        # toggle pause/resume (POSIX)
+New-Item $env:TEMP/neonreach_play.pause          # freeze (Windows; delete to resume)
 ```
 
 The ~7–12 s startup also offsets the script's clock from wall time; correlate
@@ -264,6 +275,38 @@ Treat any run with stalls as void.
 - No release staggering is needed in real-time play — consecutive balls leave at
   28 m/s and are metres apart by the next throw. Staggering matters only for the
   frozen volley (below).
+
+## Windows port
+
+The scripts are cross-platform; the differences from the original macOS setup:
+
+- **Unity connection is the Unity Pipeline package, not MCP.**
+  `PipelineClient` (`mcp_client.py`) POSTs to the editor's pipeline server
+  (`127.0.0.1:7800/api/exec`) with the Bearer token from
+  `Library/Pipeline/.unity-pipeline-port` — the same channel the `unity` CLI
+  uses, minus its ~900 ms per-call process-spawn overhead. Measured eval: ~120 ms
+  cold, ~30 ms warm. `NEONREACH_UNITY=mcp` selects the legacy Meta MCP bridge;
+  `NEONREACH_PROJECT` overrides project-root discovery.
+- **Operator proxy path is resolved per platform** (`%APPDATA%\metavr\tools\...\
+  windows\meta-xr-operator-mcp-proxy.exe` on Windows, override with
+  `NEONREACH_OPERATOR_BIN`).
+- **No SIGUSR1 on Windows.** Pause/resume for inspection via the pause file
+  (`%TEMP%\neonreach_play.pause`: create to freeze, delete to resume); the PID
+  file also lives under the platform temp dir. SIGUSR1 still works on POSIX.
+- **Close proxies explicitly.** `OperatorClient.close()` closes stdin (EOF lets
+  the proxy exit cleanly), terminates, and reaps — otherwise GC-time pipe
+  finalization prints `OSError: EINVAL` shutdown noise on Windows.
+- **Remember the layer env (bring-up step 2).** It is set in-process and dies
+  with the editor session — after any Unity restart, re-set
+  `XR_API_LAYER_PATH`/`XR_ENABLE_API_LAYERS` via `unity command eval` and
+  re-enter Play Mode before the operator tools work.
+
+Full-game run on Windows (shipping settings, health 10), ending in a genuine
+game over — matches the macOS results:
+
+| Run | Loop | Observe | Throws | Hits | Survived | First miss |
+|---|---|---|---|---|---|---|
+| Windows, pipeline Unity link | 15.2 Hz | 35 ms | 226 | 92 % | 121.8 s | 48 s |
 
 ## Moving targets: freeze → lead → throw → unfreeze
 

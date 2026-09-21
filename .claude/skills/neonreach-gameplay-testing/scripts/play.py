@@ -23,13 +23,17 @@ import argparse
 import atexit
 import math
 import os
-import re
 import signal
 import sys
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor
 
-PID_FILE = "/tmp/neonreach_play.pid"
+_tmp = tempfile.gettempdir()
+PID_FILE = os.path.join(_tmp, "neonreach_play.pid")
+# Cross-platform pause toggle: creating this file freezes the run for
+# inspection, deleting it resumes. (Windows has no SIGUSR1.)
+PAUSE_FILE = os.path.join(_tmp, "neonreach_play.pause")
 
 # Toggled by SIGUSR1 so a running session can be frozen for inspection without
 # killing it:   kill -USR1 $(cat /tmp/neonreach_play.pid)
@@ -42,7 +46,20 @@ def _toggle_pause(_sig, _frm):
 
 from aim_solver import (solve_angled, RELEASE_Y, RELEASE_Z, RELEASE_SIDE,
                         Y_OFFSET, Z_OFFSET)
-from mcp_client import OperatorClient, BridgeClient, McpError
+from mcp_client import OperatorClient, PipelineClient, BridgeClient, McpError
+
+
+def _make_unity_client():
+    """Unity connection: pipeline (default) or legacy MCP bridge.
+
+    NEONREACH_UNITY=pipeline uses the Unity Pipeline package over direct HTTP
+    (no MCP, ~30 ms/call). NEONREACH_UNITY=mcp uses the Meta Unity MCP
+    Extensions bridge (macOS legacy path, port 48736).
+    """
+    which = os.environ.get("NEONREACH_UNITY", "pipeline").lower()
+    if which == "mcp":
+        return BridgeClient()
+    return PipelineClient()
 
 # All three ring prefabs instantiate under their own names. Watching only
 # "Ring(Clone)" makes the bot blind to every gold (weaving) and purple
@@ -63,20 +80,35 @@ DODGE_LOOKAHEAD_Z = 7.0
 HEAD_Y = 1.70
 HEAD_X_LIMIT = 1.9
 
-# Resolved at startup - Unity instance IDs are reassigned on every Play Mode
-# session, so a hardcoded value silently breaks miss tracking and game-over
-# detection (every read errors, the run idles straight past a real death).
+# GameManager state is read through GameManager.Instance directly, so no
+# instance-ID lookup is needed. (The legacy MCP bridge path needed one because
+# its GetComponentValue API addresses components by instance ID; the pipeline
+# eval path does not.) Kept as a stub for the legacy bridge only.
 GAME_MANAGER_ID = None
 
 
 def resolve_game_manager_id(bridge):
-    """Look up the GameManager's live instance ID for this Play Mode session."""
+    """Look up the GameManager's live instance ID (legacy MCP bridge only)."""
+    import re
     r = str(bridge.scene("SearchGameObjects", searchPattern="GameManager",
                          exactMatch=True))
     m = re.search(r"ID:\s*(\d+)", r)
     if not m:
         raise RuntimeError(f"GameManager not found - is Play Mode running? {r}")
     return m.group(1)
+
+
+def read_game_state(bridge):
+    """(score, missed, is_game_over), one round trip on the pipeline path."""
+    if isinstance(bridge, PipelineClient):
+        return bridge.game_state()
+    m = int(str(bridge.scene("GetComponentValue", instanceId=GAME_MANAGER_ID,
+                             componentName="GameManager",
+                             memberName="MissedRings")).split("=")[-1].split("(")[0].strip())
+    over = str(bridge.scene("GetComponentValue", instanceId=GAME_MANAGER_ID,
+                            componentName="GameManager",
+                            memberName="IsGameOver")).split("=")[-1].split("(")[0].strip()
+    return 0, m, over.lower() == "true"
 
 
 class Ring:
@@ -309,29 +341,32 @@ def main():
                          "immediately after a known-good active phase")
     args = ap.parse_args()
 
-    signal.signal(signal.SIGUSR1, _toggle_pause)
+    if hasattr(signal, "SIGUSR1"):
+        signal.signal(signal.SIGUSR1, _toggle_pause)
     with open(PID_FILE, "w") as fh:
         fh.write(str(os.getpid()))
-    print(f"pid {os.getpid()} -> {PID_FILE}   "
-          f"(kill -USR1 to pause/resume for inspection)")
+    print(f"pid {os.getpid()} -> {PID_FILE}")
+    if hasattr(signal, "SIGUSR1"):
+        print("  pause/resume: kill -USR1 $(cat %s)  or touch %s"
+              % (PID_FILE, PAUSE_FILE))
+    else:
+        print(f"  pause/resume: create/delete {PAUSE_FILE}")
 
     op = OperatorClient()
-    bridge = BridgeClient()
+    bridge = _make_unity_client()
     observer = ParallelObserver(RING_PATHS)
     tracker = Tracker()
     hands = [Hand("right", op), Hand("left", op)]
 
     global GAME_MANAGER_ID
-    GAME_MANAGER_ID = resolve_game_manager_id(bridge)
-    print(f"GameManager instance id {GAME_MANAGER_ID}")
-
-    def field(name):
-        r = bridge.scene("GetComponentValue", instanceId=GAME_MANAGER_ID,
-                         componentName="GameManager", memberName=name)
-        v = str(r).split("=")[-1].split("(")[0].strip()
-        if "DATA:" not in str(r):
-            raise RuntimeError(f"GameManager.{name} read failed: {r}")
-        return v
+    if not isinstance(bridge, PipelineClient):
+        GAME_MANAGER_ID = resolve_game_manager_id(bridge)
+        print(f"GameManager instance id {GAME_MANAGER_ID}")
+    try:
+        _s0, _m0, _o0 = read_game_state(bridge)
+    except (ValueError, RuntimeError, McpError) as exc:
+        raise RuntimeError(f"GameManager unreadable - is Play Mode running? {exc}")
+    print(f"GameManager live: score {_s0} missed {_m0} over {_o0}")
 
     # Clear any stance left behind by a previous session BEFORE unpausing, so
     # the first frame of the new game already has hands and head where they
@@ -346,6 +381,13 @@ def main():
             reset_stance(op, 0.0)
         except Exception:
             pass
+        finally:
+            # Reap the (possibly freshly reconnected) proxy so no orphaned
+            # proxy or un-reaped pipes survive interpreter teardown.
+            try:
+                op.close()
+            except Exception:
+                pass
     atexit.register(_cleanup)
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
     signal.signal(signal.SIGINT, lambda *_: sys.exit(0))
@@ -358,7 +400,8 @@ def main():
     t0 = time.time()
     ticks = observe_ms = disappeared = unreachable = dodges = 0
     stalls, worst_stall = 0, 0.0
-    head_x, next_poll, prev_missed, poll_fails = 0.0, 0.0, 0, 0
+    head_x, next_poll, poll_fails = 0.0, 0.0, 0
+    prev_score, prev_missed = _s0, _m0  # seed from the pre-unpause read
     next_obstacle_poll, obstacles = 0.0, []
     events, reason = [], "time limit"
 
@@ -374,8 +417,10 @@ def main():
             globals()["_pause_requested"] = True
 
         # Hold the world still, but keep the loop alive so it can be resumed.
-        if _pause_requested != paused:
-            paused = _pause_requested
+        # Pause sources: SIGUSR1 (POSIX) and the pause file (all platforms).
+        want_pause = _pause_requested or os.path.exists(PAUSE_FILE)
+        if want_pause != paused:
+            paused = want_pause
             bridge.set_time_scale(0.0 if paused else 1.0)
             state = "PAUSED for inspection" if paused else "resumed"
             events.append((round(now - t0, 1), state))
@@ -472,13 +517,12 @@ def main():
         if now >= next_poll:
             next_poll = now + 0.4
             try:
-                m = int(field("MissedRings"))
-                over = field("IsGameOver").lower() == "true"
+                score, m, over = read_game_state(bridge)
                 poll_fails = 0
-            except (ValueError, RuntimeError) as exc:
+            except (ValueError, RuntimeError, McpError) as exc:
                 # A blind poll means misses and game over go unseen and the run
                 # idles past a real death, so tolerate a blip and then bail.
-                m, over = prev_missed, False
+                score, m, over = prev_score, prev_missed, False
                 poll_fails += 1
                 if poll_fails >= 5:
                     raise RuntimeError(
@@ -489,12 +533,13 @@ def main():
                 prev_missed = m
                 if args.pause_on_miss:
                     globals()["_pause_requested"] = True
+            prev_score = score
             if over:
                 # The final miss can land between the MissedRings read and this
                 # one, so re-read or the summary reports 9/10 on a game over.
                 try:
-                    prev_missed = int(field("MissedRings"))
-                except (ValueError, RuntimeError):
+                    prev_score, prev_missed, _ = read_game_state(bridge)
+                except (ValueError, RuntimeError, McpError):
                     pass
                 events.append((round(now - t0, 1), "GAME OVER"))
                 reason = "game over"
@@ -525,6 +570,7 @@ def main():
               f"{worst_stall/1000:.1f}s - RESULTS SUSPECT, the game ran "
               f"unattended during these")
     print(f"rings vanished {disappeared}")
+    print(f"score          {prev_score}")
     print(f"MissedRings    {prev_missed} / 10")
     if went_idle:
         drained = prev_missed - idle_at_missed
