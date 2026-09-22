@@ -81,3 +81,7 @@ crashlytics-build.properties
 Assets/Resources/DevAgentSettings.asset
 Assets/Resources/DevAgentSettings.asset.meta
 out/
+
+# Python bytecode (test harness scripts)
+__pycache__/
+*.py[cod]
